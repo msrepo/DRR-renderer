@@ -4,6 +4,10 @@ The code generates DRR images in a transparent and simple manner, the user can t
 The DRR generation takes 2 seconds on a Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz 8 cores on Ubuntu 14.10.
 The .mhd standard is not fixed, therefore it might happen that the CT header use other terms than the ones used in our code for header element such as Element Spacing,... This should be check before running the code.
 
+- Added parsing of input arguments using argparse library(https://github.com/hbristow/argparse)
+- TODO: Read MET_FLOAT type MHD file correctly
+- TODO: read Nifti file format
+
 [![DOI](https://zenodo.org/badge/88970535.svg)](https://zenodo.org/badge/latestdoi/88970535)
 
 

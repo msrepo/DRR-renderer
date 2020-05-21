@@ -4,6 +4,8 @@ ADD_DEFINITIONS(
     -std=c++11
     -O3
 )
+set(STD_EXPERIMENTAL_FS "-lstdc++fs")
+
 message("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -12,8 +14,14 @@ if (OPENMP_FOUND)
 endif()
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+find_package(Eigen3 REQUIRED)
 include_directories( ${EIGEN3_INCLUDE_DIR} )
-add_executable(${PROJECT_NAME} main.cpp DRRgenerator.cpp )
-target_link_libraries( ${PROJECT_NAME}   ${OpenCV_LIBS}  )
+
+
+include_directories(argparse)
+
+add_executable(${PROJECT_NAME} src/main.cpp src/DRRgenerator.cpp )
+target_link_libraries( ${PROJECT_NAME}   ${OpenCV_LIBS}  Eigen3::Eigen stdc++fs)
 
 
