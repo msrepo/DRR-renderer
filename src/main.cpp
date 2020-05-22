@@ -31,6 +31,7 @@ int main(int argc, const char **argv) {
   std::string CT_folder = "data/";
   std::string raw_filename = CT_folder + "FullHead.raw";
   std::string info_filename = CT_folder + "FullHead.mhd";
+
   const std::string DEFAULT_FILETYPE = "MHD";
   std::string filetype = DEFAULT_FILETYPE;
 
@@ -45,7 +46,9 @@ int main(int argc, const char **argv) {
   }
 
   const auto startct = chrono::system_clock::now();
+
   drrgene.load_CT(raw_filename, info_filename);
+
   const auto stopct = chrono::system_clock::now();
   const auto duratct =
       chrono::duration_cast<chrono::milliseconds>(stopct - startct).count();
@@ -64,6 +67,7 @@ int main(int argc, const char **argv) {
   std::string out_filename =
       info_filename.substr(0, info_filename.rfind(".")) + ".png";
   std::cout << "Writing DRR to file " << out_filename << std::endl;
+
   std::cout << "Matrix size:" << color.size() << std::endl;
   cv::imwrite(out_filename, color);
   cv::waitKey(0);

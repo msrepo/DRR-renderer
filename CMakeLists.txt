@@ -18,10 +18,14 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 find_package(Eigen3 REQUIRED)
 include_directories( ${EIGEN3_INCLUDE_DIR} )
 
+find_package(ITK REQUIRED)
+include(${ITK_USE_FILE})
+
 
 include_directories(argparse)
+include_directories(readNifti)
 
-add_executable(${PROJECT_NAME} src/main.cpp src/DRRgenerator.cpp )
-target_link_libraries( ${PROJECT_NAME}   ${OpenCV_LIBS}  Eigen3::Eigen stdc++fs)
+add_executable(${PROJECT_NAME} src/main.cpp readNifti/niftireader.cpp src/DRRgenerator.cpp)
+target_link_libraries( ${PROJECT_NAME}  ${ITK_LIBRARIES} ${OpenCV_LIBS}  Eigen3::Eigen stdc++fs)
 
 

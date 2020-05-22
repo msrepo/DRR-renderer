@@ -70,6 +70,7 @@ class DRRgenerator {
   DRRgenerator();
   void load_CT(std::string filename_raw, std::string info,
                std::string filetype = "MHD");
+  void experimental_load_nifti(std::string filename);
   Eigen::Isometry3f cv2eigeniso(cv::Mat transfo);
   void raytracegpu(cv::Mat &color, float resizefactor = 1.0);
   float trilinear_interpolation(short *a, cv::Point3f pt);

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iterator>
 #include <sstream>
+#include "niftireader.h"
 
 /* in the constructor, we define the camera parameter
  * it should be changed according to your needs
@@ -145,7 +146,6 @@ void DRRgenerator::load_CT(std::string filename_raw, std::string info,
     if (file_line.find("ElementType =") != std::string::npos) {
       std::size_t pos = file_line.find("=");
       std::string typestring = file_line.substr(pos + 1);
-      std::cout << typestring << std::endl;
       if (typestring.compare(5, 5, "UCHAR") == 0) type = 0;
       if (typestring.compare(5, 5, "SHORT") == 0) type = 1;
       if (typestring.compare(5, 5, "FLOAT") == 0) type = 2;
@@ -170,16 +170,6 @@ void DRRgenerator::load_CT(std::string filename_raw, std::string info,
   } else if (type == 1)
     size_t res = fread(CTvol_or.data, sizeof(short), imgx * imgy * imgz, file);
   else if (type == 2) {
-    CTvolume<float> CTvol_fl =
-        CTvolume<float>(imgx, imgy, imgz, vsx, vsy, vsz, 0);
-    size_t res = fread(CTvol_fl.data, 2, imgx * imgy * imgz, file);
-    for (int i = 0; i < imgx; i++)
-      for (int j = 0; j < imgy; j++)
-        for (int k = 0; k < imgz; k++) {
-          CTvol_or.at(i, j, k) = (short)CTvol_fl.at(i, j, k);
-          std::cout << "MET_FLOAT:" << CTvol_fl.at(i, j, k)
-                    << " TO_SHORT:" << (short)CTvol_fl.at(i, j, k);
-        }
   }
   std::cout << "ct" << CTvol_or.data[0] << std::endl;
 
@@ -190,6 +180,42 @@ void DRRgenerator::load_CT(std::string filename_raw, std::string info,
 
   CTvol = CTvol_or;
   fclose(file);
+}
+
+void DRRgenerator::experimental_load_nifti(string filename) {
+  // initialize CTvol from file
+  NiftiReader reader(filename);
+  double vsx = 0;
+  double vsy = 0;
+  double vsz = 0;
+  int imgx = 0;
+  int imgy = 0;
+  int imgz = 0;  // change the info from mhd file
+  float *offset = new float[3];
+  imgx = reader.getSize<0>();
+  imgy = reader.getSize<1>();
+  imgz = reader.getSize<2>();
+  vsx = reader.getVoxelSize<0>();
+  vsy = reader.getVoxelSize<1>();
+  vsz = reader.getVoxelSize<2>();
+  offset[0] = reader.getOrigin<0>();
+  offset[1] = reader.getOrigin<1>();
+  offset[2] = reader.getOrigin<2>();
+  std::cout << " " << vsx << " " << vsy << " " << vsz << " " << imgx << " "
+            << imgy << " " << imgz << std::endl;
+  CTvolume<short> CTvol_or =
+      CTvolume<short>(imgx, imgy, imgz, vsx, vsy, vsz, 1);
+  CTvol_or.offset = offset;
+  auto iter = reader.imgIterator();
+  int count = 0;
+  for (int i = 0; i < imgx; i++)
+    for (int j = 0; j < imgy; j++)
+      for (int k = 0; k < imgz; k++) {
+        CTvol_or.at(i, j, k) = iter.Value();
+        ++count;
+        ++iter;
+        if (count % 100) std::cout << "Value:" << iter.Value() << std::endl;
+      }
 }
 
 void DRRgenerator::split(const string &s, vector<string> &elems) {
@@ -208,8 +234,6 @@ void DRRgenerator::split(const string &s, vector<string> &elems) {
 
 void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
   // size of the final DRR (transposed)
-  const int DRR_WIDTH = 640;
-  const float DRR_ASPECTRATIO = CTvol.size_x / CTvol.size_y;
   int rows = 640 * resizeFactor;
   int cols = 480 * resizeFactor;
 
