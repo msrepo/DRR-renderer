@@ -38,6 +38,18 @@ class NiftiReader {
   double getOrigin() {
     return imgreader->GetImageIO()->GetOrigin(i);
   }
+  std::string PixelType() {
+    return imgreader->GetImageIO()->GetPixelTypeAsString(
+        imgreader->GetImageIO()->GetPixelType());
+  }
+
+  double Value(int i, int j, int k) {
+    ImgType::IndexType index;
+    index[0] = i;
+    index[1] = j;
+    index[2] = k;
+    return img->GetPixel(index);
+  }
 
  private:
   std::string filename;
