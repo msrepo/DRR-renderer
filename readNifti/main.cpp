@@ -51,7 +51,7 @@ int main(int argc, const char** argv) {
     return 0;
   }
   BaseImage::Pointer imageIO = getImageIO(filepath);
-
+  int numDimensions = num_dimensions(imageIO);
   // In order to read a image, we need its dimensionality and component type
   std::cout << "numDimensions: " << num_dimensions(imageIO) << std::endl;
   std::cout << "component type: "
@@ -96,6 +96,12 @@ int main(int argc, const char** argv) {
   int i = 0, j = 0, k = 0;
   std::cout << "Niftireader(PixelValue)[0,0,0]: " << filereader.Value(i, j, k)
             << '\n';
+  const ImgType::DirectionType& direction = img->GetDirection();
+  std::cout << "Direction = " << std::endl;
+  std::cout << direction << std::endl;
+
+  auto dict = img->GetMetaDataDictionary();
+
   i = 100;
   j = 100;
   k = 10;
