@@ -5,8 +5,9 @@ The DRR generation takes 2 seconds on a Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz 
 The .mhd standard is not fixed, therefore it might happen that the CT header use other terms than the ones used in our code for header element such as Element Spacing,... This should be check before running the code.
 
 - Added parsing of input arguments using argparse library(https://github.com/hbristow/argparse)
+- Added:  read Nifti file format
+- TODO: add attenuation lookup (LUT) to better simulate drr
 - TODO: Read MET_FLOAT type MHD file correctly
-- TODO: read Nifti file format
 
 ![Sample Output](https://github.com/msrepo/DRR-renderer/blob/master/FullHead.png)
 
