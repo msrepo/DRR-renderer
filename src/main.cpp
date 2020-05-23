@@ -1,6 +1,7 @@
 #include <argparse.h>
 #include <chrono>
 #include <iostream>
+#include <string>
 #include "DRRgenerator.h"
 using namespace std;
 using namespace argparse;
@@ -9,16 +10,20 @@ int main(int argc, const char **argv) {
   ArgumentParser parser("Parse CT file path");
   parser.enable_help();
   parser.add_argument("-f", "--file", "file path", true);
-  parser.add_argument("-t", "--type", "file type");
-  parser.add_argument("-x", "--resize", "resize factor");
-  parser.add_argument("-r", "--rot", "rotation x y z ");
-
-  parser.add_argument("-s", "--size", "size of the output image");
+  parser.add_argument("-x", "--resize", "resize factor", false);
+  parser.add_argument("-r", "--rot", "rotation x y z ", false);
+  parser.add_argument("-u", "--resolution", false);
   parser.add_argument("-i", "--inverse",
-                      "invert x-ray? yes-> dark values for dense structure");
-  parser.add_argument("-o", "--output", "output file name");
+                      "invert x-ray? yes-> dark values for dense structure",
+                      false);
+  parser.add_argument("-o", "--output", "output file name", false);
 
   auto err = parser.parse(argc, argv);
+
+  if (parser.exists("help")) {
+    parser.print_help();
+    return 0;
+  }
 
   bool invert = false;
   if (parser.exists("i")) invert = true;
@@ -36,16 +41,8 @@ int main(int argc, const char **argv) {
     yaw = rotations[2];
   }
 
-  int sx = 512, sy = 512;
-  if (parser.exists("s")) {
-    std::vector<int> size = parser.get<std::vector<int>>("s");
-    sx = size[0];
-    sy = size[1];
-    std::for_each(size.begin(), size.end(),
-                  [](const int &e) { std::cout << e << " "; });
-  }
   const auto startct = chrono::system_clock::now();
-  DRRgenerator drrgene(roll, pitch, yaw, sx, sy, resizefactor, invert);
+  DRRgenerator drrgene(roll, pitch, yaw, resizefactor, invert);
   drrgene.load_CT(filename);
 
   const auto stopct = chrono::system_clock::now();
@@ -61,8 +58,8 @@ int main(int argc, const char **argv) {
       chrono::duration_cast<chrono::milliseconds>(stop - start).count();
   std::cout << "DRR created in " << durat << " ms" << std::endl;
 
-  cv::namedWindow("DRR" + filename, CV_WINDOW_KEEPRATIO);
-  cv::imshow("DRR" + filename, color);
+  cv::namedWindow("DRR-" + filename, CV_WINDOW_KEEPRATIO);
+  cv::imshow("DRR-" + filename, color);
   std::cout << "Matrix size:" << color.size() << std::endl;
   if (parser.exists("o")) {
     std::string out_filename = "output.png";

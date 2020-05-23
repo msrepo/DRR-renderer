@@ -71,18 +71,29 @@ class DRRgenerator {
   float roll_, pitch_, yaw_;  // in degrees
   bool invert;                // if true, denser structure are shown darker
   double width, level;
-  int sx, sy;
   float resizefactor;
+  struct CTnum_LAC {
+    float ctnum;
+    float LAC;
+  };
+  std::vector<CTnum_LAC> LUT = {
+      {21, 0.000289},    {282, 0.0747},   {443, 0.11205},  {909, 0.13708},
+      {911, 0.09568},    {970, 0.18216},  {1016, 0.153},   {1027, 0.230945},
+      {1029, 0.159355},  {1113, 0.17135}, {1114, 0.29268}, {1143, 0.1888},
+      {0.3744, 0.33813}, {1301, 0.5544},  {1329, 1.06485}, {1571, 0.90852},
+      {2034, 1.6224},    {2516, 2.484},
+  };
 
  public:
-  DRRgenerator(float rx = 0.0, float ry = 0.0, float rz = 0.0, int sx = 512,
-               int sy = 512, float resizefactor = 1.0, bool invert = false);
+  DRRgenerator(float rx = 0.0, float ry = 0.0, float rz = 0.0,
+               float resizefactor = 1.0, bool invert = false);
 
   void load_CT(std::string filename);
   Eigen::Isometry3f cv2eigeniso(cv::Mat transfo);
   void raytracegpu(cv::Mat &color);
   float trilinear_interpolation(cv::Point3f pt);
   float attenuation_lookup_hu(float pix_density);
+  float attenuation_lookup_LUT(float pix_density);
   float attenuation_lookup(float pix_density);
   void findentryandexitpoint(Vector3f startpoint, Vector3f ray,
                              double &texitpoint, double &tentrypoint);

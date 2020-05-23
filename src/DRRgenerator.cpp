@@ -9,11 +9,9 @@
  *it supposed that the CT coordinate system is centered on the CT center
  */
 
-DRRgenerator::DRRgenerator(float rx, float ry, float rz, int sx_, int sy_,
-                           float resizefactor_, bool inv)
+DRRgenerator::DRRgenerator(float rx, float ry, float rz, float resizefactor_,
+                           bool inv)
     : roll_(rx), pitch_(ry), yaw_(rz), invert(inv) {
-  sx = sx_;
-  sy = sy_;
   resizefactor = resizefactor_;
   width = 1800.0;
   level = 400.0;  // values specific to spine bones
@@ -146,6 +144,7 @@ void DRRgenerator::raytracegpu(cv::Mat &color) {
   // size of the final DRR (transposed)
   //  int rows = CTvol.size_x * resizeFactor;
   //  int cols = CTvol.size_y * resizeFactor;
+  // TODO: change orientation according to rotation argument
   int rows = CTvol.size_x * resizefactor;
   int cols = CTvol.size_y * resizefactor;
 
@@ -235,6 +234,7 @@ void DRRgenerator::raytracegpu(cv::Mat &color) {
   cv::minMaxIdx(color_raw, &min, &max);
   cout << "max" << max << endl;
   cout << "min" << min << endl;
+
   float scale = 255 / (max - min);
   color_raw.convertTo(color, CV_8UC1, scale, -min * scale);
   // image inversion to get dark values for dense structures
@@ -255,17 +255,32 @@ float DRRgenerator::attenuation_lookup_hu(float pix_density) {
   double max_hu = level + width / 2.0;
   // this is a threshold on the density, if you want to consider
   // less dense matter in the DRR, decrease this value to -1000.
-  if (CTvol.typevalue == 0) min_hu = 100;
+  //  if (CTvol.typevalue == 0) min_hu = 100;
   double mu_h2o = 0.022;
   if (pix_density <= min_hu) {
     return 0.0;
-  } else {
-    return (pix_density / 1000.0) * mu_h2o + mu_h2o;
+  } else if (pix_density > max_hu) {
+    pix_density = max_hu;
   }
+  return (pix_density / 1000.0) * mu_h2o + mu_h2o;
+}
+
+float DRRgenerator::attenuation_lookup_LUT(float pix_density) {
+  if (pix_density < 21) pix_density = 21;
+  if (pix_density > 2516) pix_density = 2516;
+  std::vector<CTnum_LAC>::iterator pos, earlier;
+  pos = find_if(LUT.begin(), LUT.end(), [pix_density](CTnum_LAC elem) {
+    return elem.ctnum > pix_density;
+  });
+  earlier = pos - 1;
+  return (pix_density - earlier->ctnum) * (pos->LAC - earlier->LAC) /
+             (pos->ctnum - earlier->LAC) +
+         earlier->LAC;
 }
 
 float DRRgenerator::attenuation_lookup(float pix_density) {
   return attenuation_lookup_hu(pix_density);
+  //  return attenuation_lookup_LUT(pix_density);
 }
 
 Eigen::Isometry3f DRRgenerator::cv2eigeniso(cv::Mat transfo) {
