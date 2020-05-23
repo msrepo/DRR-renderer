@@ -72,14 +72,15 @@ class DRRgenerator {
   bool invert;                // if true, denser structure are shown darker
   double width, level;
   int sx, sy;
+  float resizefactor;
 
  public:
   DRRgenerator(float rx = 0.0, float ry = 0.0, float rz = 0.0, int sx = 512,
-               int sy = 512, bool invert = false);
+               int sy = 512, float resizefactor = 1.0, bool invert = false);
 
   void load_CT(std::string filename);
   Eigen::Isometry3f cv2eigeniso(cv::Mat transfo);
-  void raytracegpu(cv::Mat &color, float resizefactor = 1.0);
+  void raytracegpu(cv::Mat &color);
   float trilinear_interpolation(cv::Point3f pt);
   float attenuation_lookup_hu(float pix_density);
   float attenuation_lookup(float pix_density);

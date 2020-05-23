@@ -10,14 +10,15 @@
  */
 
 DRRgenerator::DRRgenerator(float rx, float ry, float rz, int sx_, int sy_,
-                           bool inv)
+                           float resizefactor_, bool inv)
     : roll_(rx), pitch_(ry), yaw_(rz), invert(inv) {
   sx = sx_;
   sy = sy_;
+  resizefactor = resizefactor_;
   width = 1800.0;
   level = 400.0;  // values specific to spine bones
   std::cout << "rx " << roll_ << " ry " << pitch_ << " rz " << yaw_
-            << std::endl;
+            << " resizefactor " << resizefactor << std::endl;
 }
 
 /* this function load a mhd + raw file
@@ -132,8 +133,8 @@ void DRRgenerator::setCameraExtrinsics() {
   cam.intrinsics_video = cv::Mat::eye(3, 3, CV_64F);
   cam.intrinsics_video.at<double>(0, 0) = 2200;
   cam.intrinsics_video.at<double>(1, 1) = 2200;
-  cam.intrinsics_video.at<double>(0, 2) = 0;  // 320
-  cam.intrinsics_video.at<double>(1, 2) = 0;  // 240
+  cam.intrinsics_video.at<double>(0, 2) = CTvol.size_x * resizefactor / 2;
+  cam.intrinsics_video.at<double>(1, 2) = CTvol.size_y * resizefactor / 2;
 }
 
 /* we  average the CT values along the ray created from the pixel of our final
@@ -141,12 +142,12 @@ void DRRgenerator::setCameraExtrinsics() {
  *
  */
 
-void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
+void DRRgenerator::raytracegpu(cv::Mat &color) {
   // size of the final DRR (transposed)
   //  int rows = CTvol.size_x * resizeFactor;
   //  int cols = CTvol.size_y * resizeFactor;
-  int rows = sx;
-  int cols = sy;
+  int rows = CTvol.size_x * resizefactor;
+  int cols = CTvol.size_y * resizefactor;
 
   color = cv::Mat::zeros(rows, cols, CV_8UC1);
   cv::Mat color_raw = cv::Mat::zeros(rows, cols, CV_64F);

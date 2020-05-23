@@ -10,16 +10,22 @@ int main(int argc, const char **argv) {
   parser.enable_help();
   parser.add_argument("-f", "--file", "file path", true);
   parser.add_argument("-t", "--type", "file type");
+  parser.add_argument("-x", "--resize", "resize factor");
   parser.add_argument("-r", "--rot", "rotation x y z ");
-  parser.add_argument("-o", "--output", "output file name");
+
   parser.add_argument("-s", "--size", "size of the output image");
   parser.add_argument("-i", "--inverse",
                       "invert x-ray? yes-> dark values for dense structure");
+  parser.add_argument("-o", "--output", "output file name");
 
   auto err = parser.parse(argc, argv);
 
   bool invert = false;
   if (parser.exists("i")) invert = true;
+  float resizefactor = 1.0;
+  if (parser.exists("x")) resizefactor = parser.get<float>("x");
+  if (parser.exists("o"))
+    std::cout << "Output " << parser.get<std::string>("o") << '\n';
   string filename = parser.get<std::string>("f");
 
   float roll = 0.0, pitch = 0.0, yaw = 0.0;
@@ -39,7 +45,7 @@ int main(int argc, const char **argv) {
                   [](const int &e) { std::cout << e << " "; });
   }
   const auto startct = chrono::system_clock::now();
-  DRRgenerator drrgene(roll, pitch, yaw, sx, sy, invert);
+  DRRgenerator drrgene(roll, pitch, yaw, sx, sy, resizefactor, invert);
   drrgene.load_CT(filename);
 
   const auto stopct = chrono::system_clock::now();
@@ -55,17 +61,14 @@ int main(int argc, const char **argv) {
       chrono::duration_cast<chrono::milliseconds>(stop - start).count();
   std::cout << "DRR created in " << durat << " ms" << std::endl;
 
-  cv::namedWindow("DRR", CV_WINDOW_KEEPRATIO);
-  cv::imshow("DRR", color);
-
-  if (parser.exists("output")) {
+  cv::namedWindow("DRR" + filename, CV_WINDOW_KEEPRATIO);
+  cv::imshow("DRR" + filename, color);
+  std::cout << "Matrix size:" << color.size() << std::endl;
+  if (parser.exists("o")) {
     std::string out_filename = "output.png";
-    if (parser.exists("o")) {
-      out_filename = parser.get<std::string>("o");
-    }
+    out_filename = parser.get<std::string>("o");
     std::cout << "Writing DRR to file " << out_filename << std::endl;
 
-    std::cout << "Matrix size:" << color.size() << std::endl;
     cv::imwrite(out_filename, color);
   }
 
