@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "niftireader.h"
 
 #define _USE_MATH_DEFINES
 
@@ -65,15 +66,21 @@ class DRRgenerator {
   CTvolume<short> CTvol;
   CameraDataGPU cam;
   void split(const string &s, vector<string> &elems);
+  void setCameraExtrinsics();
+  NiftiReader reader;
+  float roll_, pitch_, yaw_;  // in degrees
+  bool invert;                // if true, denser structure are shown darker
+  double width, level;
+  int sx, sy;
 
  public:
-  DRRgenerator();
-  void load_CT(std::string filename_raw, std::string info,
-               std::string filetype = "MHD");
-  void experimental_load_nifti(std::string filename);
+  DRRgenerator(float rx = 0.0, float ry = 0.0, float rz = 0.0, int sx = 512,
+               int sy = 512, bool invert = false);
+
+  void load_CT(std::string filename);
   Eigen::Isometry3f cv2eigeniso(cv::Mat transfo);
   void raytracegpu(cv::Mat &color, float resizefactor = 1.0);
-  float trilinear_interpolation(short *a, cv::Point3f pt);
+  float trilinear_interpolation(cv::Point3f pt);
   float attenuation_lookup_hu(float pix_density);
   float attenuation_lookup(float pix_density);
   void findentryandexitpoint(Vector3f startpoint, Vector3f ray,

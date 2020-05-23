@@ -9,22 +9,96 @@
  *it supposed that the CT coordinate system is centered on the CT center
  */
 
-DRRgenerator::DRRgenerator() {
-  cam = CameraDataGPU();
+DRRgenerator::DRRgenerator(float rx, float ry, float rz, int sx_, int sy_,
+                           bool inv)
+    : roll_(rx), pitch_(ry), yaw_(rz), invert(inv) {
+  sx = sx_;
+  sy = sy_;
+  width = 1800.0;
+  level = 400.0;  // values specific to spine bones
+  std::cout << "rx " << roll_ << " ry " << pitch_ << " rz " << yaw_
+            << std::endl;
+}
 
+/* this function load a mhd + raw file
+ * we load the information of translation, but does not use it in the rest of
+ * code
+ */
+
+void DRRgenerator::load_CT(std::string filename) {
+  reader.setFilename(filename);
+  reader.initialize();
+  double vsx = 0;
+  double vsy = 0;
+  double vsz = 0;
+  int imgx = 0;
+  int imgy = 0;
+  int imgz = 0;  // change the info from mhd file
+
+  float *offset = new float[3];
+
+  int type = 3;  // float
+
+  // Dimsize
+  imgx = reader.getSize<0>();
+  imgy = reader.getSize<1>();
+  imgz = reader.getSize<2>();
+
+  // Element Size
+
+  vsx = reader.getVoxelSize<0>();
+  vsy = reader.getVoxelSize<1>();
+  vsz = reader.getVoxelSize<2>();
+
+  // Origin
+  offset[0] = reader.getOrigin<0>();
+  offset[1] = reader.getOrigin<1>();
+  offset[2] = reader.getOrigin<2>();
+
+  std::cout << " " << vsx << " " << vsy << " " << vsz << " " << imgx << " "
+            << imgy << " " << imgz << " " << type << " " << offset[0] << " "
+            << offset[1] << " " << offset[2] << std::endl;
+
+  CTvolume<short> CTvol_or =
+      CTvolume<short>(imgx, imgy, imgz, vsx, vsy, vsz, 1);
+  CTvol_or.offset = offset;
+  CTvol_or.typevalue = type;
+
+  std::cout << "ct" << reader.Value(0, 0, 0) << std::endl;
+
+  //  std::cout << "max"
+  //            << *std::max_element(CTvol_or.data,
+  //                                 CTvol_or.data + imgx * imgy * imgz - 1)
+  //            << std::endl;
+
+  CTvol = CTvol_or;
+  setCameraExtrinsics();
+}
+
+void DRRgenerator::split(const string &s, vector<string> &elems) {
+  std::vector<std::string> vec;
+
+  istringstream iss(s);
+  copy(istream_iterator<string>(iss), istream_iterator<string>(),
+       back_inserter(vec));
+  elems = vec;
+}
+
+void DRRgenerator::setCameraExtrinsics() {
+  cam = CameraDataGPU();
   // translation compared to the center of CT
   cv::Mat translation = cv::Mat::zeros(3, 1, CV_64F);
-  //    translation.at<double>(0)=0;
-  //    translation.at<double>(1)=0;
-  //    translation.at<double>(2)=0;
+  //  translation.at<double>(0) = tx;
+  //  translation.at<double>(1) = ty;
+  //  translation.at<double>(2) = tz;
 
   cv::Mat transfotranslation = cv::Mat::eye(4, 4, CV_64F);
   for (int i = 0; i < 3; i++)
     transfotranslation.at<double>(i, 3) = translation.at<double>(i);
 
-  float roll = -M_PI / 2;  // rotation around x-axis
-  float pitch = M_PI / 2;  // rotation around y-axis
-  float yaw = -M_PI / 2;   // rotation around z-axis
+  float roll = 2 * M_PI * roll_ / 360.0;    // rotation around x-axis
+  float pitch = 2 * M_PI * pitch_ / 360.0;  // rotation around y-axis
+  float yaw = 2 * M_PI * yaw_ / 360.0;      // rotation around z-axis
 
   cv::Mat rotz = cv::Mat::eye(4, 4, CV_64F);
   cv::Mat roty = cv::Mat::eye(4, 4, CV_64F);
@@ -58,173 +132,8 @@ DRRgenerator::DRRgenerator() {
   cam.intrinsics_video = cv::Mat::eye(3, 3, CV_64F);
   cam.intrinsics_video.at<double>(0, 0) = 2200;
   cam.intrinsics_video.at<double>(1, 1) = 2200;
-  cam.intrinsics_video.at<double>(0, 2) = 320;
-  cam.intrinsics_video.at<double>(1, 2) = 240;
-}
-
-/* normalization of the Hounsfield values ( taken from Plastimatch project of
-Harvard University) *which says:
- * According to NIST, the mass attenuation coefficient of H2O at 50 keV
-is 0.22 cm^2 per gram.  Thus, we scale by 0.022 per mm
-http://physics.nist.gov/PhysRefData/XrayMassCoef/ComTab/water.html
- */
-float DRRgenerator::attenuation_lookup_hu(float pix_density) {
-  double min_hu =
-      -800.0;  // this is a threshold on the density, if you want to consider
-               // less dense matter in the DRR, decrease this value to -1000.
-  if (CTvol.typevalue == 0) min_hu = 100;
-  double mu_h2o = 0.022;
-  if (pix_density <= min_hu) {
-    return 0.0;
-  } else {
-    return (pix_density / 1000.0) * mu_h2o + mu_h2o;
-  }
-}
-
-float DRRgenerator::attenuation_lookup(float pix_density) {
-  return attenuation_lookup_hu(pix_density);
-}
-
-/* this function load a mhd + raw file
- * we load the information of translation, but does not use it in the rest of
- * code
- */
-
-void DRRgenerator::load_CT(std::string filename_raw, std::string info,
-                           std::string filetype) {
-  double vsx = 0;
-  double vsy = 0;
-  double vsz = 0;
-  int imgx = 0;
-  int imgy = 0;
-  int imgz = 0;  // change the info from mhd file
-  std::ifstream fin(info);
-  if (!fin.good()) {
-    std::cout << "Could not open file " << info << std::endl;
-    std::exit(-1);
-  }
-  std::string file_line;
-  int c = 0;
-  float *offset = new float[3];
-
-  int type = 3;
-  std::cout << "inside load_CT function.." << std::endl;
-  while (std::getline(fin, file_line)) {
-    std::cout << c << ". " << file_line << std::endl;
-    c++;
-
-    if (file_line.find("DimSize =") != std::string::npos) {
-      std::size_t pos = file_line.find("=");
-      string dims = file_line.substr(pos + 1);
-      vector<string> elems;
-      split(dims, elems);
-      imgx = atoi(elems[0].c_str());
-      imgy = atoi(elems[1].c_str());
-      imgz = atoi(elems[2].c_str());
-    }
-    if ((file_line.find("ElementSpacing =") != std::string::npos) ||
-        (file_line.find("ElementSize =") != std::string::npos)) {
-      std::size_t pos = file_line.find("=");
-      string spacings = file_line.substr(pos + 1);
-      vector<string> elems;
-      split(spacings, elems);
-      vsx = atof(elems[0].c_str());
-      vsy = atof(elems[1].c_str());
-      vsz = atof(elems[2].c_str());
-    }
-
-    if (file_line.find("Position =") != std::string::npos) {
-      std::size_t pos = file_line.find("=");
-      string spacings = file_line.substr(pos + 1);
-      vector<string> elems;
-      split(spacings, elems);
-      offset[0] = atof(elems[0].c_str());
-      offset[1] = atof(elems[1].c_str());
-      offset[2] = atof(elems[2].c_str());
-    }
-
-    if (file_line.find("ElementType =") != std::string::npos) {
-      std::size_t pos = file_line.find("=");
-      std::string typestring = file_line.substr(pos + 1);
-      if (typestring.compare(5, 5, "UCHAR") == 0) type = 0;
-      if (typestring.compare(5, 5, "SHORT") == 0) type = 1;
-      if (typestring.compare(5, 5, "FLOAT") == 0) type = 2;
-    }
-  }
-  std::cout << c << " " << vsx << " " << vsy << " " << vsz << " " << imgx << " "
-            << imgy << " " << imgz << " " << type << std::endl;
-
-  CTvolume<short> CTvol_or =
-      CTvolume<short>(imgx, imgy, imgz, vsx, vsy, vsz, 1);
-  CTvol_or.offset = offset;
-  CTvol_or.typevalue = type;
-  auto file = fopen(filename_raw.data(), "rb");
-  if (type == 0) {
-    CTvolume<uchar> CTvol_un =
-        CTvolume<uchar>(imgx, imgy, imgz, vsx, vsy, vsz, 0);
-    size_t res = fread(CTvol_un.data, sizeof(uchar), imgx * imgy * imgz, file);
-    for (int i = 0; i < imgx; i++)
-      for (int j = 0; j < imgy; j++)
-        for (int k = 0; k < imgz; k++)
-          CTvol_or.at(i, j, k) = (short)CTvol_un.at(i, j, k);
-  } else if (type == 1)
-    size_t res = fread(CTvol_or.data, sizeof(short), imgx * imgy * imgz, file);
-  else if (type == 2) {
-  }
-  std::cout << "ct" << CTvol_or.data[0] << std::endl;
-
-  std::cout << "max"
-            << *std::max_element(CTvol_or.data,
-                                 CTvol_or.data + imgx * imgy * imgz - 1)
-            << std::endl;
-
-  CTvol = CTvol_or;
-  fclose(file);
-}
-
-void DRRgenerator::experimental_load_nifti(string filename) {
-  // initialize CTvol from file
-  NiftiReader reader(filename);
-  double vsx = 0;
-  double vsy = 0;
-  double vsz = 0;
-  int imgx = 0;
-  int imgy = 0;
-  int imgz = 0;  // change the info from mhd file
-  float *offset = new float[3];
-  imgx = reader.getSize<0>();
-  imgy = reader.getSize<1>();
-  imgz = reader.getSize<2>();
-  vsx = reader.getVoxelSize<0>();
-  vsy = reader.getVoxelSize<1>();
-  vsz = reader.getVoxelSize<2>();
-  offset[0] = reader.getOrigin<0>();
-  offset[1] = reader.getOrigin<1>();
-  offset[2] = reader.getOrigin<2>();
-  std::cout << " " << vsx << " " << vsy << " " << vsz << " " << imgx << " "
-            << imgy << " " << imgz << std::endl;
-  CTvolume<short> CTvol_or =
-      CTvolume<short>(imgx, imgy, imgz, vsx, vsy, vsz, 1);
-  CTvol_or.offset = offset;
-  auto iter = reader.imgIterator();
-  int count = 0;
-  for (int i = 0; i < imgx; i++)
-    for (int j = 0; j < imgy; j++)
-      for (int k = 0; k < imgz; k++) {
-        CTvol_or.at(i, j, k) = iter.Value();
-        ++count;
-        ++iter;
-        if (count % 100) std::cout << "Value:" << iter.Value() << std::endl;
-      }
-}
-
-void DRRgenerator::split(const string &s, vector<string> &elems) {
-  std::vector<std::string> vec;
-
-  istringstream iss(s);
-  copy(istream_iterator<string>(iss), istream_iterator<string>(),
-       back_inserter(vec));
-  elems = vec;
+  cam.intrinsics_video.at<double>(0, 2) = 0;  // 320
+  cam.intrinsics_video.at<double>(1, 2) = 0;  // 240
 }
 
 /* we  average the CT values along the ray created from the pixel of our final
@@ -234,8 +143,10 @@ void DRRgenerator::split(const string &s, vector<string> &elems) {
 
 void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
   // size of the final DRR (transposed)
-  int rows = 640 * resizeFactor;
-  int cols = 480 * resizeFactor;
+  //  int rows = CTvol.size_x * resizeFactor;
+  //  int cols = CTvol.size_y * resizeFactor;
+  int rows = sx;
+  int cols = sy;
 
   color = cv::Mat::zeros(rows, cols, CV_8UC1);
   cv::Mat color_raw = cv::Mat::zeros(rows, cols, CV_64F);
@@ -255,6 +166,7 @@ void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
   Isometry3f transfo = cv2eigeniso(cam.extrinsics_video);
   Matrix3f rot = transfo.linear();
   Vector3f startPos = transfo.translation();
+  std::cout << "Camera centre:" << startPos << '\n';
 
   // step for the raytracing ( we move of the smallest size of voxel here)
   float pas = 1 * min_voxelsize;
@@ -304,7 +216,7 @@ void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
         double z = (curr[2] + sz) * vs_inv_z;
 
         // we get the value of the CT and sum it
-        u_curr = trilinear_interpolation(CTvol.data, cv::Point3f(x, y, z));
+        u_curr = trilinear_interpolation(cv::Point3f(x, y, z));
         sum += u_curr;
         count++;  // we count also the number of voxel crossed for avergaing
                   // later
@@ -325,10 +237,34 @@ void DRRgenerator::raytracegpu(cv::Mat &color, float resizeFactor) {
   float scale = 255 / (max - min);
   color_raw.convertTo(color, CV_8UC1, scale, -min * scale);
   // image inversion to get dark values for dense structures
-  bitwise_not(color, color);
+  if (invert) bitwise_not(color, color);
 
   // Rotate images by 90 degrees because our y/z in 3D is flipped
   cv::transpose(color, color);
+}
+
+/* normalization of the Hounsfield values ( taken from Plastimatch project of
+Harvard University) *which says:
+ * According to NIST, the mass attenuation coefficient of H2O at 50 keV
+is 0.22 cm^2 per gram.  Thus, we scale by 0.022 per mm
+http://physics.nist.gov/PhysRefData/XrayMassCoef/ComTab/water.html
+ */
+float DRRgenerator::attenuation_lookup_hu(float pix_density) {
+  double min_hu = level - width / 2.0;
+  double max_hu = level + width / 2.0;
+  // this is a threshold on the density, if you want to consider
+  // less dense matter in the DRR, decrease this value to -1000.
+  if (CTvol.typevalue == 0) min_hu = 100;
+  double mu_h2o = 0.022;
+  if (pix_density <= min_hu) {
+    return 0.0;
+  } else {
+    return (pix_density / 1000.0) * mu_h2o + mu_h2o;
+  }
+}
+
+float DRRgenerator::attenuation_lookup(float pix_density) {
+  return attenuation_lookup_hu(pix_density);
 }
 
 Eigen::Isometry3f DRRgenerator::cv2eigeniso(cv::Mat transfo) {
@@ -343,7 +279,7 @@ Eigen::Isometry3f DRRgenerator::cv2eigeniso(cv::Mat transfo) {
  * around the 8 corners of the voxel around this point. Gives a smoother result
  */
 
-float DRRgenerator::trilinear_interpolation(short *a, cv::Point3f pt) {
+float DRRgenerator::trilinear_interpolation(cv::Point3f pt) {
   int dx = CTvol.size_x;
   int dy = CTvol.size_y;
 
@@ -356,22 +292,30 @@ float DRRgenerator::trilinear_interpolation(short *a, cv::Point3f pt) {
   cv::Point3i p110 = cv::Point3i(p000.x + 1, p000.y + 1, p000.z);
   cv::Point3i p010 = cv::Point3i(p000.x, p000.y + 1, p000.z);
 
-  float u000 =
-      attenuation_lookup(a[p000.x + dx * p000.y + dx * dy * p000.z] - 1024);
-  float u100 =
-      attenuation_lookup(a[p100.x + dx * p100.y + dx * dy * p100.z] - 1024);
-  float u010 =
-      attenuation_lookup(a[p010.x + dx * p010.y + dx * dy * p010.z] - 1024);
-  float u101 =
-      attenuation_lookup(a[p101.x + dx * p101.y + dx * dy * p101.z] - 1024);
-  float u001 =
-      attenuation_lookup(a[p001.x + dx * p001.y + dx * dy * p001.z] - 1024);
-  float u110 =
-      attenuation_lookup(a[p110.x + dx * p110.y + dx * dy * p110.z] - 1024);
-  float u011 =
-      attenuation_lookup(a[p011.x + dx * p011.y + dx * dy * p011.z] - 1024);
-  float u111 =
-      attenuation_lookup(a[p111.x + dx * p111.y + dx * dy * p111.z] - 1024);
+  //  float u000 =
+  //      attenuation_lookup(a[p000.x + dx * p000.y + dx * dy * p000.z] - 1024);
+  //  float u100 =
+  //      attenuation_lookup(a[p100.x + dx * p100.y + dx * dy * p100.z] - 1024);
+  //  float u010 =
+  //      attenuation_lookup(a[p010.x + dx * p010.y + dx * dy * p010.z] - 1024);
+  //  float u101 =
+  //      attenuation_lookup(a[p101.x + dx * p101.y + dx * dy * p101.z] - 1024);
+  //  float u001 =
+  //      attenuation_lookup(a[p001.x + dx * p001.y + dx * dy * p001.z] - 1024);
+  //  float u110 =
+  //      attenuation_lookup(a[p110.x + dx * p110.y + dx * dy * p110.z] - 1024);
+  //  float u011 =
+  //      attenuation_lookup(a[p011.x + dx * p011.y + dx * dy * p011.z] - 1024);
+  //  float u111 =
+  //      attenuation_lookup(a[p111.x + dx * p111.y + dx * dy * p111.z] - 1024);
+  float u000 = attenuation_lookup(reader.Value(p000.x, p000.y, p000.z));
+  float u100 = attenuation_lookup(reader.Value(p100.x, p100.y, p100.z));
+  float u010 = attenuation_lookup(reader.Value(p010.x, p010.y, p010.z));
+  float u101 = attenuation_lookup(reader.Value(p101.x, p101.y, p101.z));
+  float u001 = attenuation_lookup(reader.Value(p001.x, p001.y, p001.z));
+  float u110 = attenuation_lookup(reader.Value(p110.x, p110.y, p110.z));
+  float u011 = attenuation_lookup(reader.Value(p011.x, p011.y, p011.z));
+  float u111 = attenuation_lookup(reader.Value(p111.x, p111.y, p111.z));
 
   float xd = pt.x - p000.x;
   float yd = pt.y - p000.y;

@@ -1,3 +1,4 @@
+
 #include <argparse.h>
 #include <itkImageFileReader.h>
 #include <itkImageRegionIterator.h>
@@ -91,14 +92,15 @@ int main(int argc, const char** argv) {
   std::cout << "Niftireader(Offset): " << filereader.getOrigin<0>() << " "
             << filereader.getOrigin<1>() << " " << filereader.getOrigin<2>()
             << std::endl;
-  int i = 0;
-  ConstIteratorType iter = filereader.imgIterator();
-  while (!iter.IsAtEnd() && i < 100) {
-    std::cout << "Index:" << iter.GetIndex() << " Value:" << iter.Value()
-              << std::endl;
-    ++iter;
-    ++i;
-  }
+  std::cout << "Niftireader(Pixeltype): " << filereader.PixelType() << '\n';
+  int i = 0, j = 0, k = 0;
+  std::cout << "Niftireader(PixelValue)[0,0,0]: " << filereader.Value(i, j, k)
+            << '\n';
+  i = 100;
+  j = 100;
+  k = 10;
+  std::cout << "Niftireader(PixelValue)[0,0,0]: " << filereader.Value(i, j, k)
+            << '\n';
 
   return 0;
 }
